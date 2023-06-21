@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Job Postings</title>
+  <style>
+    .hidden {
+      display: none;
+    }
+    .visible {
+      display: block;
+    }
+    .asc:after {
+      content: " \25B2";
+    }
+    .desc:after {
+      content: " \25BC";
+    }
+    table {
+        border: 1px solid;
+    }
+    tr {
+        border: 1px solid;
+    }
+    
+    th, td {
+        padding: 15px;
+        text-align: left;
+        border: 1px solid;
+    }
+    tr:nth-child(even) {background-color: #f2f2f2;}
+
+    .filter-icon {
+      position: relative;
+      cursor: pointer;
+    }
+    .filter-icon::after {
+      content: "\2630";
+      position: absolute;
+      top: 50%;
+      right: -12px;
+      transform: translateY(-50%);
+      cursor: pointer;
+    }
+    .filter-dropdown {
+      display: none;
+      position: absolute;
+      background-color: #f9f9f9;
+      min-width: 160px;
+      box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+      z-index: 1;
+    }
+    .filter-dropdown.show {
+      display: block;
+    }
+    .filter-option {
+      cursor: pointer;
+      padding: 8px 12px;
+    }
+    .filter-option:hover {
+      background-color: #e9e9e9;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>Job Postings</h1>
+    <br> <strong>Filter Table <br> (by job type)</strong> <br>
+    <span onclick="sortTable('Job Title')" class="filter-icon"></span>
+    <br>
+    <div class="filter-dropdown">
+        <div class="filter-option" onclick="filterTableByJobTitle('')">All</div>
+        <div class="filter-option" onclick="filterTableByJobTitle('Engineer')">Engineer</div>
+        <div class="filter-option" onclick="filterTableByJobTitle('Manager')">Manager</div>
+        <div class="filter-option" onclick="filterTableByJobTitle('Designer')">Designer</div>
+    </div>
+
+  <table id="jobPostingsTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable('Job Title')">
+            Job Title
+        </th>
+        <th onclick="sortTable('Description')">Description</th>
+        <th>Location</th>
+        <th>Salary</th>
+        <th>Update/Delete</th>
+      </tr>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
+  <br>
+    <h2>Add/Remove/Update Job Posting</h2>
+    <div id="addJobPostingForm" class="hidden">
+        <h3>Add Job Posting</h3>
+        <label for="jobTitle">Job Title:</label>
+        <input type="text" id="jobTitle">
+        <label for="description">Description:</label>
+        <textarea id="description"></textarea>
+        <label for="location">Location:</label>
+        <input type="text" id="location">
+        <label for="salary">Salary:</label>
+        <input type="text" id="salary">
+        <button onclick="addJobPosting()">Add</button>
+        <button onclick="cancelAddJobPosting()">Cancel</button>
+      </div>
+      
+    <button onclick="showAddJobPostingForm()">Add Job Posting</button>
+
+      <br>
+      <br>
+  <div id="secondView" class="hidden">
+    <h2>Candidates</h2>
+    <table id="candidatesTable">
+      <thead>
+        <tr>
+          <th>Candidate Names</th>
+          <th>Candidate Emails</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+    <p id="noCandidatesMessage" class="hidden">No candidate has applied yet.</p>
+    <button onclick="hideSecondView()">Close</button>
+  </div>
+
+  <div id="updateJobPopup" class="hidden">
+    <!-- Update job posting form -->
+  </div>
+  
+
+
+  <script>
+    let jobPostingsData = [];
+
+    // Fetch job postings from the provided URL
+    const url = "https://raw.githubusercontent.com/tartane/cs2exam/main/jobs.json";
+    fetch(url)
+      .then(response => response.json())
+      .then(data => {
+        jobPostingsData = data;
+        populateJobPostings(jobPostingsData);
+      });
+
+    // Populate the job postings table
+    function populateJobPostings(jobPostings) {
+      const jobPostingsTable = document.getElementById("jobPostingsTable").getElementsByTagName('tbody')[0];
+      jobPostingsTable.innerHTML = "";
+
+      for (const jobPosting of jobPostings) {
+        const row = jobPostingsTable.insertRow();
+        row.insertCell().innerHTML = `<a href="#" onclick="showCandidates(event)">${jobPosting.job_title}</a>`;
+        row.insertCell().innerText = limitDescription(jobPosting.description, 25);
+        row.insertCell().innerText = jobPosting.location.city;
+        row.insertCell().innerText = jobPosting.salary ? jobPosting.salary : "To be discussed";
+        row.insertCell().innerHTML = `<a href="#" onclick="showUpdatePopup(event)">Update</a> | <a href="#" onclick="deleteJobPosting(event)">Delete</a>`;
+        row.dataset.candidates = JSON.stringify(jobPosting.candidates);
+      }
+    }
+
+    // Limit the description length and add ellipsis if needed
+    function limitDescription(description, wordLimit) {
+      const words = description.split(' ');
+      if (words.length > wordLimit) {
+        words.splice(wordLimit);
+        words.push('...');
+      }
+      return words.join(' ');
+    }
+
+    // Show the second view with candidate details
+    function showCandidates(event) {
+      const target = event.target;
+      const row = target.parentNode.parentNode;
+      const candidatesTable = document.getElementById("candidatesTable").getElementsByTagName('tbody')[0];
+      const noCandidatesMessage = document.getElementById("noCandidatesMessage");
+
+      candidatesTable.innerHTML = "";
+      noCandidatesMessage.classList.add("hidden");
+
+      if (row.dataset.candidates) {
+        const candidates = JSON.parse(row.dataset.candidates);
+        if (candidates.length > 0) {
+          for (const candidate of candidates) {
+            const candidateRow = candidatesTable.insertRow();
+            candidateRow.insertCell().innerText = `${candidate.first_name} ${candidate.last_name}`;
+            candidateRow.insertCell().innerText = candidate.email;
+          }
+        } else {
+          noCandidatesMessage.classList.remove("hidden");
+        }
+      } else {
+        noCandidatesMessage.classList.remove("hidden");
+      }
+
+      const secondView = document.getElementById("secondView");
+      secondView.classList.remove("hidden");
+      secondView.classList.add("visible");
+      event.preventDefault();
+    }
+
+    // Hide the second view
+    function hideSecondView() {
+      const secondView = document.getElementById("secondView");
+      secondView.classList.remove("visible");
+      secondView.classList.add("hidden");
+    }
+
+    // Sort the table based on the given column
+    function sortTable(column) {
+      const jobPostingsTable = document.getElementById("jobPostingsTable");
+      const tbody = jobPostingsTable.getElementsByTagName('tbody')[0];
+      const rows = Array.from(tbody.getElementsByTagName('tr'));
+
+      let sortOrder = jobPostingsTable.getAttribute('data-sort-order');
+      sortOrder = sortOrder === "asc" ? "desc" : "asc";
+      jobPostingsTable.setAttribute('data-sort-order', sortOrder);
+
+      rows.sort((a, b) => {
+        const aValue = a.querySelector(`td:nth-child(${columnIndex(column)})`).textContent.trim();
+        const bValue = b.querySelector(`td:nth-child(${columnIndex(column)})`).textContent.trim();
+        
+        if (sortOrder === "asc") {
+          return aValue.localeCompare(bValue);
+        } else {
+          return bValue.localeCompare(aValue);
+        }
+      });
+
+      rows.forEach(row => tbody.appendChild(row));
+
+      const th = jobPostingsTable.querySelector(`th:nth-child(${columnIndex(column)})`);
+      th.classList.remove("asc", "desc");
+      th.classList.add(sortOrder);
+    }
+
+    // Get the column index based on the column name
+    function columnIndex(column) {
+      const headers = document.querySelectorAll("#jobPostingsTable th");
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i].textContent.trim() === column) {
+          return i + 1;
+        }
+      }
+      return -1;
+    }
+
+    // Adding the Filter Table Functionality 
+    // Filter the table by job title
+    function filterTableByJobTitle(jobTitle) {
+      const jobPostingsTable = document.getElementById("jobPostingsTable");
+      const tbody = jobPostingsTable.getElementsByTagName('tbody')[0];
+      const rows = tbody.getElementsByTagName('tr');
+
+      for (let i = 0; i < rows.length; i++) {
+        const titleCell = rows[i].querySelector("td:first-child");
+        const title = titleCell.textContent.trim();
+
+        if (jobTitle === '' || title.includes(jobTitle)) {
+          rows[i].style.display = "";
+        } else {
+          rows[i].style.display = "none";
+        }
+      }
+    }
+
+    // Toggle filter dropdown
+    document.addEventListener("click", function(event) {
+      const filterIcon = event.target.closest(".filter-icon");
+      if (filterIcon) {
+        const dropdown = filterIcon.parentNode.querySelector(".filter-dropdown");
+        dropdown.classList.toggle("show");
+      } else {
+        const dropdowns = document.getElementsByClassName("filter-dropdown");
+        for (let i = 0; i < dropdowns.length; i++) {
+          const dropdown = dropdowns[i];
+          if (dropdown.classList.contains("show")) {
+            dropdown.classList.remove("show");
+          }
+        }
+      }
+    });
+
+    function showAddJobPostingForm() {
+        const addJobPostingForm = document.getElementById("addJobPostingForm");
+        addJobPostingForm.classList.remove("hidden");
+        addJobPostingForm.classList.add("visible");
+    }
+
+    function cancelAddJobPosting() {
+        const addJobPostingForm = document.getElementById("addJobPostingForm");
+        addJobPostingForm.classList.remove("visible");
+        addJobPostingForm.classList.add("hidden");
+        clearAddJobPostingForm();
+    }
+
+    function clearAddJobPostingForm() {
+        document.getElementById("jobTitle").value = "";
+        document.getElementById("description").value = "";
+        document.getElementById("location").value = "";
+        document.getElementById("salary").value = "";
+    }
+
+    function addJobPosting() {
+        const jobTitle = document.getElementById("jobTitle").value;
+        const description = document.getElementById("description").value;
+        const location = document.getElementById("location").value;
+        const salary = document.getElementById("salary").value;
+
+        if (jobTitle && description && location) {
+            const jobPosting = {
+            job_title: jobTitle,
+            description: description,
+            location: { city: location },
+            salary: salary || null,
+            candidates: []
+            };
+
+            jobPostingsData.push(jobPosting);
+            populateJobPostings(jobPostingsData);
+            cancelAddJobPosting();
+        }
+    }
+
+    
+    function deleteJobPosting(event) {
+        const row = event.target.closest("tr");
+        const jobPostingsTable = document.getElementById("jobPostingsTable");
+        const tbody = jobPostingsTable.getElementsByTagName("tbody")[0];
+
+        tbody.removeChild(row);
+
+        event.preventDefault();
+    }
+
+    function showUpdatePopup(event) {
+        const row = event.target.closest("tr");
+        const jobPostingsTable = document.getElementById("jobPostingsTable");
+        const jobTitle = row.cells[0].textContent.trim();
+        const description = row.cells[1].textContent.trim();
+        const location = row.cells[2].textContent.trim();
+        const salary = row.cells[3].textContent.trim();
+
+        const updateJobPopup = document.getElementById("updateJobPopup");
+        updateJobPopup.innerHTML = `
+            <h3>Update Job Posting</h3>
+            <label for="updateJobTitle">Job Title:</label>
+            <input type="text" id="updateJobTitle" value="${jobTitle}">
+            <label for="updateDescription">Description:</label>
+            <textarea id="updateDescription">${description}</textarea>
+            <label for="updateLocation">Location:</label>
+            <input type="text" id="updateLocation" value="${location}">
+            <label for="updateSalary">Salary:</label>
+            <input type="text" id="updateSalary" value="${salary}">
+            <button onclick="updateJobPosting(${row.rowIndex})">Update</button>
+            <button onclick="cancelUpdateJobPosting()">Cancel</button>
+        `;
+
+        updateJobPopup.classList.remove("hidden");
+        updateJobPopup.classList.add("visible");
+
+        event.preventDefault();
+    }
+
+    function updateJobPosting(rowIndex) {
+        const updateJobPopup = document.getElementById("updateJobPopup");
+        const jobTitle = document.getElementById("updateJobTitle").value;
+        const description = document.getElementById("updateDescription").value;
+        const location = document.getElementById("updateLocation").value;
+        const salary = document.getElementById("updateSalary").value;
+
+        const jobPostingsTable = document.getElementById("jobPostingsTable");
+        const row = jobPostingsTable.rows[rowIndex];
+
+        // Update the row's cells with the new values
+        row.cells[0].textContent = jobTitle;
+        row.cells[1].textContent = description;
+        row.cells[2].textContent = location;
+        row.cells[3].textContent = salary;
+
+        // Close the update popup
+        updateJobPopup.classList.remove("visible");
+        updateJobPopup.classList.add("hidden");
+    }
+
+    function cancelUpdateJobPosting() {
+        const updateJobPopup = document.getElementById("updateJobPopup");
+
+        // Close the update popup
+        updateJobPopup.classList.remove("visible");
+        updateJobPopup.classList.add("hidden");
+    }
+
+
+  </script>
+</body>
+</html>
